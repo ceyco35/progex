@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3307
--- Erstellungszeit: 02. Nov 2021 um 20:36
+-- Erstellungszeit: 05. Nov 2021 um 15:52
 -- Server-Version: 10.4.21-MariaDB
 -- PHP-Version: 8.0.12
 
@@ -30,12 +30,19 @@ SET time_zone = "+00:00";
 CREATE TABLE `delivery_addresses` (
   `id` int(10) NOT NULL,
   `user_id` int(10) NOT NULL,
-  `reciepient` text NOT NULL,
+  `recipient` text NOT NULL,
   `city` text NOT NULL,
   `street` text NOT NULL,
   `streetNumber` varchar(50) NOT NULL,
-  `zipcode` varchar(50) NOT NULL
+  `zipCode` varchar(50) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Daten für Tabelle `delivery_addresses`
+--
+
+INSERT INTO `delivery_addresses` (`id`, `user_id`, `recipient`, `city`, `street`, `streetNumber`, `zipCode`) VALUES
+(5, 1, 'test', 'test', 'test', 'test', 'test');
 
 --
 -- Indizes der exportierten Tabellen
@@ -56,7 +63,7 @@ ALTER TABLE `delivery_addresses`
 -- AUTO_INCREMENT für Tabelle `delivery_addresses`
 --
 ALTER TABLE `delivery_addresses`
-  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- Constraints der exportierten Tabellen
