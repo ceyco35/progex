@@ -1,4 +1,4 @@
-<div class="card">
+<div class="card"> 
   <div class="card-title"><?=$product['titel']?></div>
   <img class="card-img-top" src="<?=$product['image']?>" alt="products">
   <div class="card-body">
@@ -11,3 +11,4 @@
     <a href="index.php/cart/add/<?= $product['id']?>" class="btn btn-success btn-sm">In den Warenkorb</a>
   </div>
 </div>
+#test 
