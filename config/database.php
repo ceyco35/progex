@@ -1,3 +1,5 @@
+test
+
 <?php
 define('DB_DATABASE','shop');
 define('DB_USERNAME','shop');
