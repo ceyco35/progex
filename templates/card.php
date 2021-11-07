@@ -11,3 +11,4 @@
     <a href="index.php/cart/add/<?= $product['id']?>" class="btn btn-success btn-sm">In den Warenkorb</a>
   </div>
 </div>
+test
