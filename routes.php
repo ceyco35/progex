@@ -11,6 +11,7 @@ if(substr($baseUrl,-1)!=='/')
 {
   $baseUrl .='/';
 }
+define('BASE_URL',$baseUrl);
 $countCartItems = countProductsInCart($userId);
 $route = null;
 //$_SESSION['redirectTarget']=$baseUrl.'index.php';
@@ -79,7 +80,7 @@ if(strpos($route,'/login') !== false)
       if(isset($_SESSION['redirectTarget'])){
           $redirectTarget = $_SESSION['redirectTarget'];
       }
-        header("Location: ". $redirectTarget);
+      header("Location: ". $redirectTarget);
       exit();
     }
   }
@@ -89,35 +90,51 @@ if(strpos($route,'/login') !== false)
 }
 if(strpos($route,'/checkout') !== false)
 {
-  if(!isLoggedIn())
-  {
-    $_SESSION['redirectTarget'] = $baseUrl.'index.php/checkout';
-    header("Location: ".$baseUrl."index.php/login");
-    exit();
-  }
-
+  redirectIfNotLogged('/checkout');
+  $recipient="";
+  $city="";
+  $street="";
+  $streetNumber="";
+  $zipCode="";
+  $recipientIsValid= true;
+  $cityIsValid=true;
+  $streetIsValid=true;
+  $streetNumberIsValid=true;
+  $zipCodeIsValid=true;
+  $errors =[];
+  $hasErrors = count($errors) > 0;
+  $deliveryAddresses =getDeliveryAddressesForUser($userId);
   require __DIR__.'/templates/selectDeliveryAddress.php';
   exit();
 }
 if(strpos($route,'/logout') !== false)
 {
-  session_regenerate_id(true);
-  session_destroy();
   $redirectTarget = $baseUrl.'index.php';
   if(isset($_SESSION['redirectTarget'])){
     $redirectTarget = $_SESSION['redirectTarget'];
   }
+  session_regenerate_id(true);
+  session_destroy();
   header("Location: ".$_SESSION['redirectTarget']);
+  exit();
+}
+if(strpos($route,'/selectDeliveryAddress') !== false)
+{
+  redirectIfNotLogged('/selectDeliveryAddress');
+  $routeParts=explode("/",$route);
+  $deliveryAddressId= (int)$routeParts[2];
+  if(deliveryAddressBelongsToUser($deliveryAddressId,$userId))
+  {
+    $_SESSION['deliveryAddressId']=$deliveryAddressId;
+    header("Location: ".$baseUrl."index.php/selectPayment");
+    exit();
+  }
+  header("Location: ".baseUrl."index.php/checkout");
   exit();
 }
 if(strpos($route,'/deliveryAdress/add') !== false)
 {
-  if(false === isLoggedIn())
-  {
-    $_SESSION['redirectTarget'] = $baseUrl.'index.php/deliveryAdress/add';
-    header("Location: ".$baseUrl."index.php/login");
-    exit();
-  }
+  redirectIfNotLogged('/deliveryAdress/add');
   $recipient="";
   $city="";
   $street="";
@@ -130,6 +147,7 @@ if(strpos($route,'/deliveryAdress/add') !== false)
   $zipCodeIsValid=true;
   $isPost= isPost();
   $errors =[];
+  $deliveryAddresses =getDeliveryAddressesForUser($userId);
   if($isPost)
   {
     $recipient = filter_input(INPUT_POST,'recipient',FILTER_SANITIZE_SPECIAL_CHARS);
@@ -138,7 +156,7 @@ if(strpos($route,'/deliveryAdress/add') !== false)
     $city=trim($city);
     $street = filter_input(INPUT_POST,'street',FILTER_SANITIZE_SPECIAL_CHARS);
     $street=trim($street);
-    $streetNumber = filter_input(INPUT_POST,'streetNUmber',FILTER_SANITIZE_SPECIAL_CHARS);
+    $streetNumber = filter_input(INPUT_POST,'streetNumber',FILTER_SANITIZE_SPECIAL_CHARS);
     $streetNumber=trim($streetNumber);
     $zipCode = filter_input(INPUT_POST,'zipCode',FILTER_SANITIZE_SPECIAL_CHARS);
     $zipCode=trim($zipCode);
@@ -169,12 +187,89 @@ if(strpos($route,'/deliveryAdress/add') !== false)
     }
     if(count($errors) === 0)
     {
-      //
+      $deliveryAddressId = saveDeliveryAdressForUser($userId,$recipient,$city,$zipCode,$street,$streetNumber);
+      if($deliveryAddressId > 0)
+      {
+        $_SESSION['deliveryAddressId']=$deliveryAddressId;
+        header("Location: ".$baseUrl."index.php/selectPayment");
+        exit();
+      }
+      $errors[]="Fehler beim Speichern der Lieferadresse";
     }
   }
   $hasErrors = count($errors) > 0;
   require __DIR__.'/templates/selectDeliveryAddress.php';
   exit();
+}
+if(strpos($route,'/selectPayment') !== false)
+{
+  redirectIfNotLogged('/selectPayment');
+  $error=[];
+  $availiablePaymentMethods=["paypal"=>"PayPal","vorkasse"=>"Vorkasse"];
+  redirectIfNotLogged('/selectPayment');
+  if(!isset($_SESSION['deliveryAddressId']))
+  {
+    header("Location: ".$baseUrl."index.php/selectDeliveryAddress");
+    exit();
+  }
+  if(isPost())
+  {
+    $paymentMethod = filter_input(INPUT_POST,'paymentMethod',FILTER_SANITIZE_STRING);
+    if(!$paymentMethod)
+    {
+      $error[]="Bitte bezahl methode auswählen";
+    }
+    if($paymentMethod && !in_array($paymentMethod,array_keys($availiablePaymentMethods)))
+    {
+      $error[]="Ungültige Auswahl";
+    }
+    $deliveryAddressData = getDeliveryAddressesDataForUser($_SESSION['deliveryAddressId'],getCurrentUserId());
+    if(!$deliveryAddressData)
+    {
+      $error[]="Ausgewählt Lieferadresse wurde nicht gefunden";
+    }
+    $cartProducts = getCarItemsForUserId(getCurrentUserId());
+    if(count($cartProducts) === 0)
+    {
+      $errors[]="Warenkorb ist leer";
+    }
+    if(count($error) === 0)
+    {
+      $functionName= $paymentMethod.'CreateOrder';
+      $_SESSION['paymentMethod']=$paymentMethod;
+      call_user_func_array($functionName,[$deliveryAddressData,$cartProducts]);
+    }
+  }
+  $hasErrors= count($error)>0;
+  require __DIR__.'/templates/selectPayment.php';
+  exit();
+}
+if(strpos($route,'/paymentComplete') !== false)
+{
+  redirectIfNotLogged('/checkout');
+  if(!isset($_SESSION['paymentMethod']))
+  {
+    header("Location: ".$baseUrl."index.php/selectPayment");
+  }
+  $userId=getCurrentUserId();
+  $cartItems=getCarItemsForUserId($userId);
+  $cartSum =getCartSumForUserId($userId);
+  if($_SESSION['paymentMethod']==='paypal')
+  {
+    $_SESSION['paypalOrderToken'] = filter_input(INPUT_GET,'token',FILTER_SANITIZE_STRING);
+  }
+  /*$functionName= $_SESSION['paymentMethod'].'paymentComplete';
+  call_user_func_array($functionName,[]);*/
+  require __DIR__.'/templates/checkoutOverview.php';
+  exit();
+}
+if(strpos($route,'/completeOrder')!== false)
+{
+  redirectIfNotLogged('/checkout');
+  if(!isset($_SESSION['paymentMethod']))
+  {
+    header("Location: ".$baseUrl."index.php/selectPayment");
+  }
 }
 //$_SESSION['redirectTarget']=$baseUrl.'index.php/'.$route;
 ?>
