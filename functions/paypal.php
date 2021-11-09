@@ -39,20 +39,57 @@ function GetAccessToken():string
   return $accessToken;
 
 }
-function createOrder(string $accessToken,array $purchaseUnit)
+function getMoneyObject(string $value,string $currencyCode="EUR"): stdClass
+{
+  $object = new stdClass();
+  $object->value=$value;
+  $object->currency_code=$currencyCode;
+  return $object;
+}
+function productToPayPalItem(array $product): stdClass
+{
+  $item = new stdClass();
+  $item->name=$product['titel'];
+  $price = $product['price'];
+  $tax=number_format($price*0.19);
+  $netPrice=$price-$tax;
+  $item->unit_amount=getMoneyObject($netPrice);
+  $item->tax=getMoneyObject($tax);
+  $item->quantity=$product['amount'];
+  $item->category='PHYSICAL_GOODS';
+  $item->descriptions=$product['describtion'];
+  return $item;
+}
+function createOrder(string $accessToken,array $deliveryAddressData, array $products)
 {
   require_once CONFIG_DIR.'/paypal.php';
-  $amountObject = new stdClass();
-  $amountObject->currency_code="EUR";
-  $amountObject->value=100.00;
   $payer= new stdClass();
+  $payer->name= new stdClass();
+  $payer->name->given_name = $deliveryAddressData['recipient'];
   $payer->address= new stdClass();
-  $payer->address->address_line_1="123 asdasd";
-  $payer->address->admin_area_2="asdasdyxcwesdd";
-  $payer->address->postal_code="1337";
+  $payer->address->address_line_1=$deliveryAddressData['streetNumber'].''.$deliveryAddressData['street'];
+  $payer->address->admin_area_2= $deliveryAddressData['city'];
+  $payer->address->postal_code=$deliveryAddressData['zipCode'];
   $payer->address->admin_area_1="Deutschland";
   $payer->address->country_code="DE";
   $object= new stdClass();
+  $object->items=[];
+  $totalValue=0;
+  $itemsTotal=0;
+  $taxTotal=0;
+  foreach($products as $product)
+  {
+    $item = productToPayPalItem($product);
+    $object->items[]= $item;
+    $itemsTotal+=$item->unit_amount->value*$product['amount'];
+    $taxTotal+=$item->tax->value*$product['amount'];
+    $totalValue+=$product['price']*$product['amount'];
+  }
+  $amountObject =getMoneyObject($totalValue);
+  $amountObject->breakdown=new stdClass();
+  $amountObject->breakdown->item_total= getMoneyObject($itemsTotal);
+  $amountObject->breakdown->tax_total= getMoneyObject($taxTotal);
+
   $object->amount=$amountObject;
   $object->shipping = new stdClass();
   $object->shipping->address = $payer->address;
@@ -94,7 +131,12 @@ function createOrder(string $accessToken,array $purchaseUnit)
   {
     return '';
   }
-  setPayPalOrderId($data['status']);
+  if(!isset($data['id']))
+  {
+    var_dump($data);
+    return '';
+  }
+  setPayPalOrderId($data['id']);
   $url='';
   foreach($data['links'] as $link)
   {
@@ -138,7 +180,6 @@ function capturePayment(string $accessToken,string $orderId, string $token)
     CURLOPT_HTTPHEADER=>[
       'Content-Type: application/json',
       'Authorization: Bearer '.$accessToken,
-      //'Paypal-Request-Id: '.$payPalRequestId
     ],
     CURLOPT_POST=>true,
     CURLOPT_POSTFIELDS=>$dataString
@@ -157,7 +198,7 @@ function capturePayment(string $accessToken,string $orderId, string $token)
 function paypalCreateOrder(array $deliveryAddressData, array $cartProducts)
 {
   $accessToken = GetAccessToken();
-  createOrder($accessToken,[]);
+  createOrder($accessToken, $deliveryAddressData, $cartProducts);
 }
 function vorkasseCreateOrder(array $deliveryAddressData, array $cartProducts)
 {
