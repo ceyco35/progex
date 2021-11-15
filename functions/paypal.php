@@ -27,8 +27,8 @@ function GetAccessToken():string
   $result = curl_exec($curl);
   if(curl_errno($curl))
   {
-    curl_close($curl);
     echo curl_error($curl);
+    curl_close($curl);
     return'';
   }
   curl_close($curl);
@@ -60,9 +60,10 @@ function productToPayPalItem(array $product): stdClass
   $item->descriptions=$product['describtion'];
   return $item;
 }
-function createOrder(string $accessToken,array $deliveryAddressData, array $products)
+function paypalCreateOrder(array $deliveryAddressData, array $products)
 {
   require_once CONFIG_DIR.'/paypal.php';
+  $accessToken = GetAccessToken();
   $payer= new stdClass();
   $payer->name= new stdClass();
   $payer->name->given_name = $deliveryAddressData['recipient'];
@@ -121,8 +122,8 @@ function createOrder(string $accessToken,array $deliveryAddressData, array $prod
   $result = curl_exec($curl);
   if(curl_errno($curl))
   {
-    curl_close($curl);
     echo curl_error($curl);
+    curl_close($curl);
     return'';
   }
   curl_close($curl);
@@ -188,28 +189,24 @@ function capturePayment(string $accessToken,string $orderId, string $token)
   $result = curl_exec($curl);
   if(curl_errno($curl))
   {
-    curl_close($curl);
     echo curl_error($curl);
+    curl_close($curl);
     return'';
   }
   curl_close($curl);
   $data= json_decode($result,true);
 }
-function paypalCreateOrder(array $deliveryAddressData, array $cartProducts)
-{
-  $accessToken = GetAccessToken();
-  createOrder($accessToken, $deliveryAddressData, $cartProducts);
-}
+
 function vorkasseCreateOrder(array $deliveryAddressData, array $cartProducts)
 {
   header("Location ".BASE_URL." index.php/paymentComplete");
 }
-function paypalPaymentComplete()
+function paypalPaymentComplete($token)
 {
   $accessToken=GetAccessToken();
   $orderId = getPayPalOrderId();
   $payPalRequestId = getPayPalRequestId();
-  $token=filter_input(INPUT_GET,'token',FILTER_SANITIZE_STRING);
+  //$token=filter_input(INPUT_GET,'token',FILTER_SANITIZE_STRING);
   if($accessToken && $orderId && $token)
   {
       capturePayment($accessToken,$orderId,$token);
