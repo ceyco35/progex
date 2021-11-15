@@ -14,24 +14,28 @@ if(substr($baseUrl,-1)!=='/')
 define('BASE_URL',$baseUrl);
 $countCartItems = countProductsInCart($userId);
 $route = null;
-//$_SESSION['redirectTarget']=$baseUrl.'index.php';
 if(false !== $indexPHPPosition)
 {
   $route = substr($url,$indexPHPPosition);
   $route= str_replace('index.php','',$route);
 }
 $userId = getCurrentUserId();
-setcookie('userId',$userId,strtotime('+30 days'),$baseUrl);
+
 if(!$route)
 {
   $products = getAllProducts();
+  $flashMessages=flashMessage();
+  $hasFlashMessages=count($flashMessages)> 0;
   require __DIR__.'/templates/main.php';
   exit();
 }
 if(strpos($route,'/cart/add')!== false)
 {
+
   $routeParts=explode("/",$route);
   $productId= (int)$routeParts[3];
+  $_SESSION['redirectTarget'] = $baseUrl."index.php/cart/add".$productId;
+  redirectIfNotLogged('/login');
   addProductToCart($userId,$productId);
   header("Location: ".$baseUrl."index.php");
   exit();
@@ -74,8 +78,6 @@ if(strpos($route,'/login') !== false)
     if(0 === count($errors))
     {
       $_SESSION['userId'] = (int)$userData['id'];
-      moveCartProductsToAnotherUser($_COOKIE['userId'],(int)$userData['id']);
-      setcookie('userId',(int)$userData['id'],strtotime('+30 days'),$baseUrl);
       $redirectTarget = $baseUrl.'index.php';
       if(isset($_SESSION['redirectTarget'])){
           $redirectTarget = $_SESSION['redirectTarget'];
@@ -115,12 +117,12 @@ if(strpos($route,'/logout') !== false)
   }
   session_regenerate_id(true);
   session_destroy();
-  header("Location: ".$_SESSION['redirectTarget']);
+  header("Location: ".$redirectTarget);
   exit();
 }
 if(strpos($route,'/selectDeliveryAddress') !== false)
 {
-  redirectIfNotLogged('/selectDeliveryAddress');
+  redirectIfNotLogged('/checkout');
   $routeParts=explode("/",$route);
   $deliveryAddressId= (int)$routeParts[2];
   if(deliveryAddressBelongsToUser($deliveryAddressId,$userId))
@@ -129,7 +131,7 @@ if(strpos($route,'/selectDeliveryAddress') !== false)
     header("Location: ".$baseUrl."index.php/selectPayment");
     exit();
   }
-  header("Location: ".baseUrl."index.php/checkout");
+  header("Location: ".$baseUrl."index.php/checkout");
   exit();
 }
 if(strpos($route,'/deliveryAdress/add') !== false)
@@ -258,8 +260,7 @@ if(strpos($route,'/paymentComplete') !== false)
   {
     $_SESSION['paypalOrderToken'] = filter_input(INPUT_GET,'token',FILTER_SANITIZE_STRING);
   }
-  /*$functionName= $_SESSION['paymentMethod'].'paymentComplete';
-  call_user_func_array($functionName,[]);*/
+
   require __DIR__.'/templates/checkoutOverview.php';
   exit();
 }
@@ -269,7 +270,132 @@ if(strpos($route,'/completeOrder')!== false)
   if(!isset($_SESSION['paymentMethod']))
   {
     header("Location: ".$baseUrl."index.php/selectPayment");
+    exit();
+  }
+  if(!isset($_SESSION['deliveryAddressId']))
+  {
+    header("Location: ".$baseUrl."index.php/checkout");
+    exit();
+  }
+  $userId=getCurrentUserId();
+  $cartItems = getCarItemsForUserId($userId);
+  $functionName= $_SESSION['paymentMethod'].'paymentComplete';
+  $parameter =[];
+  if($_SESSION['paymentMethod']==='paypal')
+  {
+    $parameter =[
+      $_SESSION['paypalOrderToken']
+    ];
+  }
+  call_user_func_array($functionName,$parameter);
+  $deliveryAddressData=getDeliveryAddressesDataForUser($_SESSION['deliveryAddressId'],$userId);
+  if(createOrder($userId,$cartItems,$deliveryAddressData))
+  {
+    $number = getOrderForId($userId);
+    clearCartForUser($userId);
+    require __DIR__.'/templates/thankYouPage.php';
+    exit();
   }
 }
-//$_SESSION['redirectTarget']=$baseUrl.'index.php/'.$route;
+if(strpos($route,'/register') !== false)
+{
+  $username = "";
+  $email="";
+  $emailRepeat="";
+  $password="";
+  $passwordRepeat="";
+  $errors = [];
+  if(isPost())
+  {
+    $username=filter_input(INPUT_POST,'username',FILTER_SANITIZE_SPECIAL_CHARS);
+    $password=filter_input(INPUT_POST,'password');
+    $passwordRepeat=filter_input(INPUT_POST,'passwordRepeat');
+    $email=filter_input(INPUT_POST,'email',FILTER_SANITIZE_EMAIL);
+    $emailRepeat=filter_input(INPUT_POST,'emailRepeat',FILTER_SANITIZE_EMAIL);
+    if (false === (bool)$username) {
+        $errors[] = "Benutzername ist leer";
+    }
+
+    if (false === (bool)$password) {
+        $errors[] = "Passwort ist leer";
+    }
+    if (true === (bool)$username) {
+        if (mb_strlen($username) < 4) {
+            $errors [] = "Benutzername ist zu kurz, mindestens 4 Zeichen";
+        }
+        $usernameExists = usernameExists($username);
+        if (true === $usernameExists) {
+            $errors[] = "Benutzername bereits exestiert";
+        }
+    }
+    if (true === (bool)$password) {
+        if (mb_strlen($password) < 6) {
+            $errors[] = "Passwort ist zu kurz";
+        }
+    }
+    if ($password !== $passwordRepeat) {
+        $errors[] = "Passwörter stimmen nicht überein";
+    }
+    if (false === (bool)$email) {
+        $errors[] = "Email ist leer";
+    }
+    if (true === (bool)$email) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = "Email ist nicht gültig";
+        }
+        $emailExists = emailExists($email);
+
+        if (true === $emailExists) {
+            $errors[] = "E-Mail bereits exestiert";
+        }
+    }
+    if ($email !== $emailRepeat) {
+        $errors[] = "Email adressen stimmen nicht überein";
+    }
+    $hasErrors = count($errors) > 0;
+    if (false === $hasErrors)
+    {
+      $created = createAccount($username,$password,$email);
+      if(!$created)
+      {
+        $errors[] = "Account konnte nicht angelegt werden, versuchen Sie es später erneut";
+      }
+      if($created)
+      {
+        flashMessage("Account wurde erstellt!");
+        header("Location: ".$baseUrl."index.php");
+      }
+    }
+  }
+  $hasErrors = count($errors) > 0;
+  require_once __DIR__.'/templates/register.php';
+  exit();
+}
+if(strpos($route,'/invoice') !== false)
+{
+  redirectIfNotLogged('/');
+  $routeParts = explode('/',$route);
+  $invoiceId = null;
+  if(isset($routeParts[2]))
+  {
+    $invoiceId=(int)$routeParts[2];
+  }
+  if(!$invoiceId)
+  {
+    echo "Rechnung nicht angegeben";
+    exit();
+  }
+  $userId= getCurrentUserId();
+  $orderData = getOrderForUser($invoiceId,$userId);
+  $userData=getUserDataForId($userId);
+  $orderSum= getOrderSumForUser($invoiceId,$userId);
+  if(!$orderData)
+  {
+    echo "Daten wurden nicht gefunden";
+    exit();
+  }
+  require_once __DIR__.'/templates/invoice.php';
+  exit();
+}
+
 ?>
