@@ -13,8 +13,12 @@ function addProductToCart(int $userId, int $productId, int $amount =1)
   return $statement->execute($data);
   $statement->execute($data);
 }
-function countProductsInCart(int $userId)
+function countProductsInCart(?int $userId)
 {
+  if(null===$userId)
+  {
+    return 0;
+  }
   $sql="SELECT COUNT(id) FROM cart WHERE user_id =".$userId;
   $cartResults = getDB()->query($sql);
   if($cartResults === false)
@@ -24,8 +28,12 @@ function countProductsInCart(int $userId)
   $cartItems = $cartResults->fetchColumn();
   return $cartItems;
 }
-function getCarItemsForUserId(int $userId):array
+function getCarItemsForUserId(?int $userId):array
 {
+  if(null === $userId)
+  {
+    return [];
+  }
   $sql="SELECT product_id,titel,describtion,price,amount,image
   FROM cart
   JOIN products ON(cart.product_id = products.id)
@@ -46,8 +54,11 @@ function getCarItemsForUserId(int $userId):array
   }
   return $found;
 }
-function getCartSumForUserId(int $userId):float
+function getCartSumForUserId(?int $userId):float
 {
+  if (null === $userId) {
+        return 0;
+    }
   $sql="SELECT SUM(price * amount)
   FROM cart
   JOIN products ON(cart.product_id = products.id)
@@ -91,4 +102,12 @@ function moveCartProductsToAnotherUser(int $sourceUserId, int $targetUserId):int
     $movedProducts+= deleteProductInCartForUserId($sourceUserId,(int)$oldCartItems['product_id']);
   }
   return $movedProducts;
+}
+function clearCartForUser(int $userId)
+{
+  $sql =" DELETE FROM cart WHERE user_id = :userId";
+  $statement =getDB()->prepare($sql);
+  $statement->execute([
+    ':userId'=>$userId
+  ]);
 }
