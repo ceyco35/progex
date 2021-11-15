@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3307
--- Erstellungszeit: 05. Nov 2021 um 15:52
+-- Erstellungszeit: 15. Nov 2021 um 15:18
 -- Server-Version: 10.4.21-MariaDB
 -- PHP-Version: 8.0.12
 
@@ -42,7 +42,9 @@ CREATE TABLE `delivery_addresses` (
 --
 
 INSERT INTO `delivery_addresses` (`id`, `user_id`, `recipient`, `city`, `street`, `streetNumber`, `zipCode`) VALUES
-(5, 1, 'test', 'test', 'test', 'test', 'test');
+(6, 1, 'test', 'test', 'test', 'test', 'test'),
+(7, 3, 'RicardoMilos', 'Konstanz', 'Schürmann- Horster- Weg', '8', '78467'),
+(8, 4, 'RicardoMilos', 'Konstanz', 'Schürmann- Horster- Weg', '8', '78467');
 
 --
 -- Indizes der exportierten Tabellen
@@ -63,7 +65,7 @@ ALTER TABLE `delivery_addresses`
 -- AUTO_INCREMENT für Tabelle `delivery_addresses`
 --
 ALTER TABLE `delivery_addresses`
-  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- Constraints der exportierten Tabellen
