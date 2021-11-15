@@ -18,9 +18,9 @@ function saveDeliveryAdressForUser(int $userId, string $recipient,string $city,s
   return (int)getDB()->lastInsertId();
 }
 
-function getDeliveryAddressesForUser(int $userId):array
+function getDeliveryAddressesForUser( int $userId):array
 {
-  $sql="SELECT id,recipient,city,street,streetNumber,zipCode FROM delivery_addresses WHERE user_id =:userId";
+  $sql="SELECT id,recipient,city,street,streetNumber,zipCode FROM delivery_addresses WHERE user_id =:userId ";
   $statement =getDB()->prepare($sql);
   if(false === $statement)
   {
