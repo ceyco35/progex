@@ -15,6 +15,12 @@
           <a class="nav-link" href="index.php/register">Registrieren</a>
         </li>
         <?php endif;?>
+        <li class="nav-item">
+          <a class="nav-link" href="index.php/termsOfConditions">Terms of Conditions</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="index.php/privacyPolicy">Privacy Policy</a>
+        </li>
       </ul>
       <ul class="navbar-nav ml-auto">
         <li class="nav-item">
